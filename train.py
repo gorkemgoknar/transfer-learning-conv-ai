@@ -74,7 +74,7 @@ def get_data_loaders(args, tokenizer):
 
     logger.info("Build inputs and labels")
     datasets = {"train": defaultdict(list), "valid": defaultdict(list)}
-    print(personachat)
+    print(personachat.keys())
     for dataset_name, dataset in personachat.items():
         num_candidates = len(dataset[0]["utterances"][0]["candidates"])
         if args.num_candidates > 0 and dataset_name == 'train':
@@ -88,6 +88,8 @@ def get_data_loaders(args, tokenizer):
                         lm_labels = bool(j == num_candidates-1)
                         instance = build_input_from_segments(persona, history, candidate, tokenizer, lm_labels)
                         for input_name, input_array in instance.items():
+                            print(input_name)
+                            print(dataset_name)
                             datasets[dataset_name][input_name].append(input_array)
                     datasets[dataset_name]["mc_labels"].append(num_candidates - 1)
                     datasets[dataset_name]["n_candidates"] = num_candidates
