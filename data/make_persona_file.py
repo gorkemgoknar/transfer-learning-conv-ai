@@ -322,6 +322,22 @@ for chats in two_person_chats:
   all_utterances.append(utterances)
 
 
+from collections import defaultdict
+persona = {}
+for ut_dialog in all_utterances:
+  ##loop ut
+  for ut in ut_dialog:
+    name = ut["name"]
+    if name not in persona:
+      persona[name] = {}
+
+    persona[name]["personality"] = ut["personality"]
+    if 'utterances' not in persona[name]:
+      persona[name]["utterances"] = []
+
+    persona[name]["utterances"].append(ut)
+    
+
 
 
 ##SAVE TO JSON
@@ -335,4 +351,3 @@ persona_file = '/content/chatbot/moviepersonafile.json'
 with open(persona_file, 'w') as f:
     json.dump(all_utterances, f)
 
-    
