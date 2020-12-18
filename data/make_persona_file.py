@@ -399,6 +399,19 @@ for file in os.listdir(path):
 
 #personachat["2001"] = list( persona.values() ) 
 
+persona =[]
+for name,val in personachat.items():
+  for p in val:
+    persona.append(p)
+
+
+
+personachat = {}
+train_split_index = round(len(persona)*0.8)
+personachat["train"] = persona[0:train_split_index]
+personachat["val"] = persona[train_split_index:]
+
+
 
 
 ##SAVE TO JSON
