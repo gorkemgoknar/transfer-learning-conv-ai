@@ -340,6 +340,67 @@ for ut_dialog in all_utterances:
 
 
 
+
+
+
+
+def get_persona_from_file(file):
+ 
+  dialogs = generate_dialog_and_personality(file)
+
+
+  #number of chats containing only 2 participants
+  two_person_chats = []
+  for id, chat in enumerate( dialogs["dialogs"] ) :
+    num_chatter= len ( chat['participants'] ) 
+    #print(num_chatter)
+    if num_chatter==2:
+      two_person_chats.append([id,chat])
+
+  print("Two person chat count:{}".format(len(two_person_chats)))
+  
+  all_utterances = [] 
+  char_opening_lines = collections.defaultdict(list)
+  for chats in two_person_chats:
+    chat = chats[1]['chat']
+    utterances, char_opening_lines= get_utterance_list(chat,dialogs, char_opening_lines=char_opening_lines,  num_cadidates=10)
+    all_utterances.append(utterances)
+
+
+  persona = {}
+  for ut_dialog in all_utterances:
+    ##loop ut
+    for ut in ut_dialog:
+      name = ut["name"]
+      if name not in persona:
+        persona[name] = {}
+
+      persona[name]["personality"] = ut["personality"]
+      if 'utterances' not in persona[name]:
+        persona[name]["utterances"] = []
+
+      persona[name]["utterances"].append(ut)
+    
+  return list(persona.values())
+
+
+
+from collections import defaultdict
+personachat = {}
+
+##file = '/content/chatbot/movie_scripts/scriptcleaned/cleaned_2001.txt'
+
+path = '/content/chatbot/movie_scripts/scriptcleaned'
+for file in os.listdir(path):
+  basefile = os.path.basename(file)
+  filepath = path + "/" + file
+  print(file)
+  personachat[basefile] = get_persona_from_file(filepath)
+
+#personachat["2001"] = list( persona.values() ) 
+
+
+
 ##SAVE TO JSON
 import json
 #a_dict = {'new_key': 'new_value'}
