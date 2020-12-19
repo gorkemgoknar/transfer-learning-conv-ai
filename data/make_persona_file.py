@@ -276,6 +276,10 @@ import random
 def get_random_line_said_by_char(name,dialogs,current_recursion=0):
   max_dialogs = len( dialogs["dialogs"]) 
 
+  if current_recursion > 10:
+     ##enough already 
+     return "I could not find anything to say."
+
   #names are title mode
   name = name.title()
 
@@ -297,17 +301,18 @@ def get_random_line_said_by_char(name,dialogs,current_recursion=0):
     
 
   chat =  dialog_with_name["chat"]
+
+  if len(chat) == 0:
+    current_recursion += 1
+    return get_random_line_not_said_by_char(name,dialogs,current_recursion)
+      
+
   sample = random.sample(chat, 1) 
 
   if sample[0][0] != name :
     ##recursive! as my hit same char
     current_recursion += 1 
-    if current_recursion > 10:
-      ##enough already 
-      return "I could not find anything to say."
-    else:
-      ##2th has line
-      return get_random_line_said_by_char(name,dialogs,current_recursion) 
+    return get_random_line_said_by_char(name,dialogs,current_recursion) 
   
   #print(f"{current_recursion} recursions")
   #print(sample)
@@ -317,26 +322,30 @@ def get_random_line_said_by_char(name,dialogs,current_recursion=0):
 def get_random_line_not_said_by_char(name,dialogs,current_recursion=0):
   max_dialogs = len( dialogs["dialogs"]) 
 
+  if current_recursion > 5:
+      ##enough already 
+      return "I could not find anything to say."
+  
   random_dialog_id = random.randint(0,max_dialogs-1)
   #pick one of the chat character makes
   chat =  dialogs["dialogs"][random_dialog_id]["chat"]
+  if len(chat) == 0:
+    current_recursion += 1
+    return get_random_line_not_said_by_char(name,dialogs,current_recursion)
+      
+
+    
   sample = random.sample(chat, 1) 
 
   if sample[0][0] == name :
     ##recursive! as my hit same char
     current_recursion += 1 
-    if current_recursion > 5:
-      ##enough already 
-      return "I could not find anything to say."
-    else:
-      ##2th has line
-      return get_random_line_not_said_by_char(name,dialogs,current_recursion) 
+    ##2th has line
+    return get_random_line_not_said_by_char(name,dialogs,current_recursion) 
   
   #print(f"{current_recursion} recursions")
   #print(sample)
   return sample[0][2]
-
-
 
 
 ##build history from chat
