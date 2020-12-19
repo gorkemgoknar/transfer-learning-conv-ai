@@ -163,7 +163,7 @@ def get_chat_dialog(dialog):
     ##count number of tokens.. Currently it is adjusted for 512
     ##longer than 512 split it 
 
-    
+     
     ##TODO check name starts with in participants
     ##if name (VO) name (..) or name/Something than assume same
     ##as voice over are here too.
