@@ -64,7 +64,6 @@ def generate_dialogs(dialog_holder):
   return dialogs
     
 
-
 def preprocess_line(text):
   #add space for ( and ) chars
   ##else everthing sucks
@@ -80,13 +79,15 @@ def preprocess_line(text):
 
   #remove multi "-" if exists
   text = text.replace("--"," ")
+  
+  ##remove empty start end
+  ##it is possible text may become empty!
+  text = test.strip()
 
   return text 
+
   
   
-
-
-
 def correct_name(name):
   #check if name has name's voice or name v.o or something
   #just fetch name 
@@ -106,7 +107,6 @@ def correct_name(name):
 
   #capitalize first word only 
   return name.title()
-
 
 def get_chat_dialog(dialog):
   ##we have the dialogues
@@ -152,6 +152,12 @@ def get_chat_dialog(dialog):
       
       talk = talk[startpos+index: ]
 
+    if len(talk)<2:
+      ##there is nothing here
+      ##bypass this line
+      continue
+    
+
 
 
     ##count number of tokens.. Currently it is adjusted for 512
@@ -175,6 +181,8 @@ def get_chat_dialog(dialog):
   chat_dialog["participants"] = participants
 
   return chat_dialog
+
+
 
 
 def generate_dialog_from_file(filename):
@@ -368,6 +376,9 @@ def get_utterance_list(chat, dialogs, char_opening_lines=None, num_candidates=10
     #print("Line:\n" + str(line) )
     #print("Next line:\n" + str(next_line))
     
+    #TODO here " " spaces must be deleted for each line
+    ##and ignore those who have no lines!!
+    ##some text can not be properly parsed  
     history = [line[2] for line in chat[0:(id+1)]]
 
     name_under_test = next_line[0]
@@ -420,7 +431,7 @@ def get_utterance_list(chat, dialogs, char_opening_lines=None, num_candidates=10
     utterance["personality"] = personality
                     
   return utterances, char_opening_lines
-  
+
 
 
 

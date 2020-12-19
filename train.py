@@ -199,6 +199,7 @@ def train():
     # Evaluation function and evaluator (evaluator output is the input of the metrics)
     def inference(engine, batch):
         model.eval()
+        logger.info("Passing inference")
         with torch.no_grad():
             batch = tuple(input_tensor.to(args.device) for input_tensor in batch)
             input_ids, mc_token_ids, lm_labels, mc_labels, token_type_ids = batch
