@@ -65,6 +65,18 @@ def generate_dialogs(dialog_holder):
     
 
 
+def preprocess_line(text):
+  #add space for ( and ) chars
+  ##else everthing sucks
+  
+  text = text.replace("("," ( ")
+  text = text.replace(")"," ( ")
+
+  #remove "-" if exists
+  text = text.replace("-"," ")
+
+  return text 
+  
 def get_chat_dialog(dialog):
   ##we have the dialogues
   #now generate utterances.
@@ -91,11 +103,13 @@ def get_chat_dialog(dialog):
       continue
 
     talk = " ".join(splitted[1:]).strip()
+
+    talk = preprocess_line(talk)
     
     ##TODO check name starts with in participants
     ##if name (VO) name (..) or name/Something than assume same
     ##as voice over are here too.
-    
+
     if name not in participants:
       participants[name] = participant_number
       participant_number += 1 
@@ -109,6 +123,7 @@ def get_chat_dialog(dialog):
   chat_dialog["participants"] = participants
 
   return chat_dialog
+
 
 
 def generate_dialog_from_file(filename):
@@ -215,7 +230,7 @@ def get_random_line_not_said_by_char(name,dialogs,current_recursion=0):
     current_recursion += 1 
     if current_recursion > 5:
       ##enough already 
-      return ["I could not find anything to say."]
+      return "I could not find anything to say."
     else:
       ##2th has line
       return get_random_line_not_said_by_char(name,dialogs,current_recursion) 
