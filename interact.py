@@ -132,7 +132,24 @@ def run():
     logger.info("Sample a personality")
     dataset = get_dataset(tokenizer, args.dataset_path, args.dataset_cache)
     personalities = [dialog["personality"] for dataset in dataset.values() for dialog in dataset]
+
+
+    logger.info("Tokenize and encode the dataset")
+    def tokenize(obj):
+        if isinstance(obj, str):
+            return tokenizer.convert_tokens_to_ids(tokenizer.tokenize(obj))
+        if isinstance(obj, dict):
+            return dict((n, tokenize(o)) for n, o in obj.items())
+        return list(tokenize(o) for o in obj)
+    
+
     personality = random.choice(personalities)
+
+    ##TALK TO HAL
+    personality_hal = ["that's true. my name is hal"]
+    personality = tokenize(personality_hal)
+    print(personality)
+
     logger.info("Selected personality: %s", tokenizer.decode(chain(*personality)))
 
     history = []

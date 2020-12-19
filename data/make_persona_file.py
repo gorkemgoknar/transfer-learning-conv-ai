@@ -82,7 +82,7 @@ def preprocess_line(text):
   
   ##remove empty start end
   ##it is possible text may become empty!
-  text = test.strip()
+  text = text.strip()
 
   return text 
 
