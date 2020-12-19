@@ -475,8 +475,7 @@ for ut_dialog in all_utterances:
 
 
 
-
-def get_persona_from_file(file):
+def get_persona_from_file(file, all_chats=False, max_num_chatter=3):
  
   dialogs = generate_dialog_and_personality(file)
 
@@ -484,18 +483,25 @@ def get_persona_from_file(file):
   #number of chats containing only 2 participants
   two_person_chats = []
   for id, chat in enumerate( dialogs["dialogs"] ) :
+    if all_chats:
+      two_person_chats.append([id,chat])
+      continue
+    
     num_chatter= len ( chat['participants'] ) 
     #print(num_chatter)
-    if num_chatter==2:
+    if num_chatter<=max_num_chatter:
       two_person_chats.append([id,chat])
-
-  print("Two person chat count:{}".format(len(two_person_chats)))
   
+  if all_chats:
+    print("Multi user chat count:{}".format(len(two_person_chats)))
+  else:
+    print("Max {} person chat count:{}".format(max_num_chatter, len(two_person_chats)))
+
   all_utterances = [] 
   char_opening_lines = collections.defaultdict(list)
   for chats in two_person_chats:
     chat = chats[1]['chat']
-    utterances, char_opening_lines= get_utterance_list(chat,dialogs, char_opening_lines=char_opening_lines,  num_cadidates=10)
+    utterances, char_opening_lines= get_utterance_list(chat,dialogs, char_opening_lines=char_opening_lines,  num_candidates=10)
     all_utterances.append(utterances)
 
 
