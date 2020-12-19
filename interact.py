@@ -146,9 +146,9 @@ def run():
     personality = random.choice(personalities)
 
     ##TALK TO HAL
-    personality_hal = ["that's true. my name is hal"]
-    personality = tokenize(personality_hal)
-    print(personality)
+    #personality_hal = ["that's true. my name is hal"]
+    #personality = tokenize(personality_hal)
+    #print(personality)
 
     logger.info("Selected personality: %s", tokenizer.decode(chain(*personality)))
 
