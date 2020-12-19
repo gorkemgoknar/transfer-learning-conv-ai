@@ -102,7 +102,7 @@ def get_chat_dialog(dialog):
     if len(name)>22:
       continue
 
-    if len(splitted[1:])> 544:
+    if len(splitted[1:])> 512:
       #do not get long lines.
       #have token limit of 512
       continue
