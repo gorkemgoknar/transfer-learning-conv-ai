@@ -184,7 +184,6 @@ def get_chat_dialog(dialog):
 
 
 
-
 def generate_dialog_from_file(filename):
   with open(filename) as f:
     lines = f.readlines()
