@@ -69,14 +69,17 @@ def preprocess_line(text):
   #add space for ( and ) chars
   ##else everthing sucks
   
-  text = text.replace("("," ( ")
-  text = text.replace(")"," ( ")
+  #text = text.replace("("," ( ")
+  #text = text.replace(")"," ( ")
 
-  #remove "-" if exists
-  text = text.replace("-"," ")
+  #remove multi "-" if exists
+  text = text.replace("--"," ")
 
   return text 
+
   
+  
+
 def get_chat_dialog(dialog):
   ##we have the dialogues
   #now generate utterances.
@@ -102,15 +105,28 @@ def get_chat_dialog(dialog):
     if len(name)>22:
       continue
 
-    if len(splitted[1:])> 512:
-      #do not get long lines.
-      #have token limit of 512
-      continue
 
 
     talk = " ".join(splitted[1:]).strip()
 
     talk = preprocess_line(talk)
+
+    if len(talk)> 500:
+      #do not get long lines.
+      #have token limit of 512
+      #find first . after 300th
+      startpos=350
+      index = l[startpos:].find('.')
+      #if it finds position will be startpos+index, else it will be startpos-1
+      print(f"LONG LINE split after pos {startpos+index}: " + talk)
+      
+      talk = talk[startpos+index: ]
+
+
+
+    ##count number of tokens.. Currently it is adjusted for 512
+    ##longer than 512 split it 
+
     
     ##TODO check name starts with in participants
     ##if name (VO) name (..) or name/Something than assume same
@@ -129,7 +145,6 @@ def get_chat_dialog(dialog):
   chat_dialog["participants"] = participants
 
   return chat_dialog
-
 
 
 def generate_dialog_from_file(filename):
