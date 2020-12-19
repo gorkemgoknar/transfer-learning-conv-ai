@@ -73,7 +73,7 @@ def get_data_loaders(args, tokenizer):
     personachat = get_dataset(tokenizer, args.dataset_path, args.dataset_cache)
 
     logger.info("Build inputs and labels")
-    datasets = {"train": defaultdict(list), "val": defaultdict(list)}
+    datasets = {"train": defaultdict(list), "valid": defaultdict(list)}
     print(personachat.keys())
     for dataset_name, dataset in personachat.items():
         num_candidates = len(dataset[0]["utterances"][0]["candidates"])
