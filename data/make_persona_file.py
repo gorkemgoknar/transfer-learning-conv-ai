@@ -71,14 +71,42 @@ def preprocess_line(text):
   
   #text = text.replace("("," ( ")
   #text = text.replace(")"," ( ")
+  
+  #TODO remote text inside ( )
+  #these include some action and emotions
+  find_between_paranthesis= '\(.*?\)'
+  #print( re.findall(find_between_paranthesis,text) ) 
+  text = re.sub(find_between_paranthesis ,' ', text)
 
   #remove multi "-" if exists
   text = text.replace("--"," ")
 
   return text 
+  
+  
+
+
+
+def correct_name(name):
+  #check if name has name's voice or name v.o or something
+  #just fetch name 
+  name = name.lower()
+  name = name.replace("'s voice","")
+  name = name.replace("v.o.","")
+  name = name.replace("v.o","")
+  name = name.replace("tv.","")
+  name = name.replace("o.s.","")
+  name = name.replace("o.s","")
+  name = name.replace("(","")
+  name = name.replace(")","")
+  
+  name = name.strip()
 
   
-  
+
+  #capitalize first word only 
+  return name.title()
+
 
 def get_chat_dialog(dialog):
   ##we have the dialogues
@@ -100,6 +128,8 @@ def get_chat_dialog(dialog):
   for line in dialog:
     splitted = line.split(":")
     name = splitted[0].strip()
+
+    name = correct_name(name)
     
     ##max name length 22 (e.g. SOMETHING's CAPTAIN)
     if len(name)>22:
@@ -236,6 +266,45 @@ for id, chat in enumerate( dialogs["dialogs"] ) :
 
 
 import random 
+def get_random_line_said_by_char(name,dialogs,current_recursion=0):
+  max_dialogs = len( dialogs["dialogs"]) 
+
+  #names are title mode
+  name = name.title()
+
+  dialog_with_name = None
+  ##loop on dialogs
+  for d in dialogs["dialogs"]:
+    
+    if name not in d['participants']:
+      #name not here 
+      continue
+    else:
+      dialog_with_name = d
+      break
+
+  if dialog_with_name is None:
+    #should not happen
+    print("Probably you gave incorrect name")
+    return "I am no one."
+    
+
+  chat =  dialog_with_name["chat"]
+  sample = random.sample(chat, 1) 
+
+  if sample[0][0] != name :
+    ##recursive! as my hit same char
+    current_recursion += 1 
+    if current_recursion > 10:
+      ##enough already 
+      return "I could not find anything to say."
+    else:
+      ##2th has line
+      return get_random_line_said_by_char(name,dialogs,current_recursion) 
+  
+  #print(f"{current_recursion} recursions")
+  #print(sample)
+  return sample[0][2]
 
 
 def get_random_line_not_said_by_char(name,dialogs,current_recursion=0):
