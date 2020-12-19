@@ -116,7 +116,7 @@ def get_chat_dialog(dialog):
       #have token limit of 512
       #find first . after 300th
       startpos=350
-      index = l[startpos:].find('.')
+      index = talk[startpos:].find('.')
       #if it finds position will be startpos+index, else it will be startpos-1
       print(f"LONG LINE split after pos {startpos+index}: " + talk)
       
@@ -268,7 +268,7 @@ def get_random_line_not_said_by_char(name,dialogs,current_recursion=0):
 #two_person_chats[5][1]['chat']
 
 
-def get_utterance_list(chat, dialogs, char_opening_lines=None, num_cadidates=10,):
+def get_utterance_list(chat, dialogs, char_opening_lines=None, num_candidates=10, use_personality_score=False):
   
   if char_opening_lines is None:
     char_opening_lines = collections.defaultdict(list)
@@ -277,7 +277,7 @@ def get_utterance_list(chat, dialogs, char_opening_lines=None, num_cadidates=10,
 
   ##build utterance list 
 
-  utterances = [] 
+  utterances = []
 
   for id, line in enumerate( chat ):
     ##check if next line exists:
@@ -322,27 +322,35 @@ def get_utterance_list(chat, dialogs, char_opening_lines=None, num_cadidates=10,
   #for each utterance generate personality 
   for utterance in utterances:
     name = utterance["name"]
-    personality_traits= dialogs["personalities"][name]
 
     personality = []
 
-    p_openness  = "inventive curious" if  personality_traits[0] == 1 else "consistent cautious"
-    p_conscientiousness = "efficient organized" if personality_traits[1] == 1 else "easy-going careless"
-    p_extraversion = "outgoing energetic" if personality_traits[2] == 1 else "solitary reserved"
-    p_agreebleness = "friendly compassionate" if personality_traits[3] == 1 else "challenging detached"
-    p_neuroticism = "sensitive nervous" if personality_traits[4] == 1 else "secure confident"
+    if use_personality_score:
+      personality_traits= dialogs["personalities"][name]
 
-    personality.append("I am " + p_openness)
-    personality.append("I am " +p_conscientiousness)
-    personality.append("I am " +p_extraversion)
-    personality.append("I am " +p_agreebleness)
-    personality.append("I am " +p_neuroticism)
-    personality.append("My name is " + name)
+      p_openness  = "inventive curious" if  personality_traits[0] == 1 else "consistent cautious"
+      p_conscientiousness = "efficient organized" if personality_traits[1] == 1 else "easy-going careless"
+      p_extraversion = "outgoing energetic" if personality_traits[2] == 1 else "solitary reserved"
+      p_agreebleness = "friendly compassionate" if personality_traits[3] == 1 else "challenging detached"
+      p_neuroticism = "sensitive nervous" if personality_traits[4] == 1 else "secure confident"
 
-    utterance["personality"] = personality              
+      personality.append("I am " + p_openness)
+      personality.append("I am " +p_conscientiousness)
+      personality.append("I am " +p_extraversion)
+      personality.append("I am " +p_agreebleness)
+      personality.append("I am " +p_neuroticism)
+    else:
+      char_line = get_random_line_said_by_char(name,dialogs)
+      if len(char_line)> 100:
+        startpos=90
+        index = l[startpos:].find('.')
+        char_line = char_line[startpos+index: ]
+      personality.append(char_line)
+    
+    personality.append("My name is " + name +".")
+    utterance["personality"] = personality
                     
   return utterances, char_opening_lines
-  
   
 
 
