@@ -10,20 +10,21 @@ from itertools import chain
 
 import torch
 from torch.nn.parallel import DistributedDataParallel
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, TensorDataset
 from ignite.engine import Engine, Events
-from ignite.handlers import ModelCheckpoint, global_step_from_engine
+from ignite.handlers import ModelCheckpoint
 from ignite.metrics import Accuracy, Loss, MetricsLambda, RunningAverage
 from ignite.contrib.handlers import ProgressBar, PiecewiseLinear
 from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OutputHandler, OptimizerParamsHandler
-from transformers import (AdamW, OpenAIGPTDoubleHeadsModel, OpenAIGPTTokenizer,
+from pytorch_transformers import (AdamW, OpenAIGPTDoubleHeadsModel, OpenAIGPTTokenizer,
                                   GPT2DoubleHeadsModel, GPT2Tokenizer, WEIGHTS_NAME, CONFIG_NAME)
 
 from utils import get_dataset, make_logdir
 
 SPECIAL_TOKENS = ["<bos>", "<eos>", "<speaker1>", "<speaker2>", "<pad>"]
 ATTR_TO_SPECIAL_TOKEN = {'bos_token': '<bos>', 'eos_token': '<eos>', 'pad_token': '<pad>',
-                         'additional_special_tokens': ['<speaker1>', '<speaker2>']}
+                         'additional_special_tokens': ('<speaker1>', '<speaker2>')}
 MODEL_INPUTS = ["input_ids", "mc_token_ids", "lm_labels", "mc_labels", "token_type_ids"]
 PADDED_INPUTS = ["input_ids", "lm_labels", "token_type_ids"]
 
@@ -42,7 +43,7 @@ def pad_dataset(dataset, padding=0):
     """ Pad the dataset. This could be optimized by defining a Dataset class and padding at the batch level, but this is simpler. """
     max_l = max(len(x) for x in dataset["input_ids"])
     for name in PADDED_INPUTS:
-        dataset[name] = [x + [padding if name != "lm_labels" else -100] * (max_l - len(x)) for x in dataset[name]]
+        dataset[name] = [x + [padding if name != "lm_labels" else -1] * (max_l - len(x)) for x in dataset[name]]
     return dataset
 
 
@@ -62,10 +63,46 @@ def build_input_from_segments(persona, history, reply, tokenizer, lm_labels=Fals
     instance["input_ids"] = list(chain(*sequence))
     instance["token_type_ids"] = [speaker2 if i % 2 else speaker1 for i, s in enumerate(sequence) for _ in s]
     instance["mc_token_ids"] = len(instance["input_ids"]) - 1
-    instance["lm_labels"] = [-100] * len(instance["input_ids"])
+    instance["lm_labels"] = [-1] * len(instance["input_ids"])
     if lm_labels:
-        instance["lm_labels"] = ([-100] * sum(len(s) for s in sequence[:-1])) + [-100] + sequence[-1][1:]
+        instance["lm_labels"] = ([-1] * sum(len(s) for s in sequence[:-1])) + [-1] + sequence[-1][1:]
     return instance
+
+
+def pad_and_tensorize(batch_dict, padding):
+    """ Pad the batch_dict."""
+    tensors = []
+    for name in MODEL_INPUTS:
+        if name not in PADDED_INPUTS:
+            tensors.append(torch.tensor(batch_dict[name]))
+            continue
+        entry = batch_dict[name]
+        pad_id = padding if name != "lm_labels" else -1
+        padded = pad_sequence([torch.tensor(seq) for x in entry for seq in x], batch_first=True,
+                              padding_value=pad_id)
+        bs, n_candidates = len(entry), len(entry[0])
+        tensors.append(padded.view(bs, n_candidates, -1))
+    return tensors
+
+class ChatDataset(torch.utils.data.Dataset):
+
+    def __init__(self, fields, pad_id):
+        self.fields = fields
+        self.pad_id = pad_id
+
+    def __getitem__(self, item) -> dict:
+        return {f: self.fields[f][item] for f in MODEL_INPUTS}
+
+    def collate_fn(self, examples):
+        batch_dict = defaultdict(list)
+        for input_name in MODEL_INPUTS:
+            for e in examples:
+                batch_dict[input_name].append(e[input_name])
+        tensors = pad_and_tensorize(batch_dict, padding=self.pad_id)
+        return tensors
+
+    def __len__(self):
+        return len(self.fields['input_ids'])
 
 
 def get_data_loaders(args, tokenizer):
@@ -73,8 +110,23 @@ def get_data_loaders(args, tokenizer):
     personachat = get_dataset(tokenizer, args.dataset_path, args.dataset_cache)
 
     logger.info("Build inputs and labels")
+    datasets: dict = make_data_lists(args, personachat, tokenizer)
+    pad_id = tokenizer.convert_tokens_to_ids(SPECIAL_TOKENS[-1])
+    train_dataset = ChatDataset(datasets['train'], pad_id)
+    valid_dataset = ChatDataset(datasets['valid'], pad_id)
+
+    logger.info("Build train and validation dataloaders")
+    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if args.distributed else None
+    valid_sampler = torch.utils.data.distributed.DistributedSampler(valid_dataset) if args.distributed else None
+    train_loader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size, shuffle=(not args.distributed),
+                              collate_fn=train_dataset.collate_fn)
+    valid_loader = DataLoader(valid_dataset, sampler=valid_sampler, batch_size=args.valid_batch_size, shuffle=False,
+                              collate_fn=valid_dataset.collate_fn)
+    return train_loader, valid_loader, train_sampler, valid_sampler
+
+
+def make_data_lists(args, personachat, tokenizer):
     datasets = {"train": defaultdict(list), "valid": defaultdict(list)}
-    print(personachat.keys())
     for dataset_name, dataset in personachat.items():
         num_candidates = len(dataset[0]["utterances"][0]["candidates"])
         if args.num_candidates > 0 and dataset_name == 'train':
@@ -83,38 +135,19 @@ def get_data_loaders(args, tokenizer):
             persona = dialog["personality"].copy()
             for _ in range(args.personality_permutations):
                 for utterance in dialog["utterances"]:
-                    history = utterance["history"][-(2*args.max_history+1):]
+                    candidate_instances = defaultdict(list)
+                    history = utterance["history"][-(2 * args.max_history + 1):]
                     for j, candidate in enumerate(utterance["candidates"][-num_candidates:]):
                         lm_labels = bool(j == num_candidates-1)
                         instance = build_input_from_segments(persona, history, candidate, tokenizer, lm_labels)
                         for input_name, input_array in instance.items():
-                            #print(input_name)
-                            #print(dataset_name)
-                            datasets[dataset_name][input_name].append(input_array)
+                            candidate_instances[input_name].append(input_array)
+                    for k in candidate_instances.keys():
+                        datasets[dataset_name][k].append(candidate_instances[k])
                     datasets[dataset_name]["mc_labels"].append(num_candidates - 1)
                     datasets[dataset_name]["n_candidates"] = num_candidates
                 persona = [persona[-1]] + persona[:-1]  # permuted personalities
-
-    logger.info("Pad inputs and convert to Tensor")
-    tensor_datasets = {"train": [], "valid": []}
-    for dataset_name, dataset in datasets.items():
-        dataset = pad_dataset(dataset, padding=tokenizer.convert_tokens_to_ids(SPECIAL_TOKENS[-1]))
-        for input_name in MODEL_INPUTS:
-            tensor = torch.tensor(dataset[input_name])
-            if input_name != "mc_labels":
-                tensor = tensor.view((-1, datasets[dataset_name]["n_candidates"]) + tensor.shape[1:])
-            tensor_datasets[dataset_name].append(tensor)
-
-    logger.info("Build train and validation dataloaders")
-    train_dataset, valid_dataset = TensorDataset(*tensor_datasets["train"]), TensorDataset(*tensor_datasets["valid"])
-    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if args.distributed else None
-    valid_sampler = torch.utils.data.distributed.DistributedSampler(valid_dataset) if args.distributed else None
-    train_loader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size, shuffle=(not args.distributed))
-    valid_loader = DataLoader(valid_dataset, sampler=valid_sampler, batch_size=args.valid_batch_size, shuffle=False)
-
-    logger.info("Train dataset (Batch, Candidates, Seq length): {}".format(train_dataset.tensors[0].shape))
-    logger.info("Valid dataset (Batch, Candidates, Seq length): {}".format(valid_dataset.tensors[0].shape))
-    return train_loader, valid_loader, train_sampler, valid_sampler
+    return datasets
 
 
 def train():
@@ -199,12 +232,10 @@ def train():
     # Evaluation function and evaluator (evaluator output is the input of the metrics)
     def inference(engine, batch):
         model.eval()
-        logger.info("Passing inference")
         with torch.no_grad():
             batch = tuple(input_tensor.to(args.device) for input_tensor in batch)
             input_ids, mc_token_ids, lm_labels, mc_labels, token_type_ids = batch
-            ##messes around comment printing token
-            ##logger.info(tokenizer.decode(input_ids[0, -1, :].tolist()))
+            logger.info(tokenizer.decode(input_ids[0, -1, :].tolist()))
             # if we dont send labels to model, it doesnt return losses
             lm_logits, mc_logits, *_ = model(
                 input_ids, token_type_ids=token_type_ids, mc_token_ids=mc_token_ids,
@@ -232,7 +263,7 @@ def train():
 
     # Prepare metrics - note how we compute distributed metrics
     RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
-    metrics = {"nll": Loss(torch.nn.CrossEntropyLoss(ignore_index=-100), output_transform=lambda x: (x[0][0], x[1][0])),
+    metrics = {"nll": Loss(torch.nn.CrossEntropyLoss(ignore_index=-1), output_transform=lambda x: (x[0][0], x[1][0])),
                "accuracy": Accuracy(output_transform=lambda x: (x[0][1], x[1][1]))}
     metrics.update({"average_nll": MetricsLambda(average_distributed_scalar, metrics["nll"], args),
                     "average_accuracy": MetricsLambda(average_distributed_scalar, metrics["accuracy"], args)})
@@ -251,7 +282,7 @@ def train():
 
         tb_logger.attach(trainer, log_handler=OutputHandler(tag="training", metric_names=["loss"]), event_name=Events.ITERATION_COMPLETED)
         tb_logger.attach(trainer, log_handler=OptimizerParamsHandler(optimizer), event_name=Events.ITERATION_STARTED)
-        tb_logger.attach(evaluator, log_handler=OutputHandler(tag="validation", metric_names=list(metrics.keys()), global_step_transform=global_step_from_engine(trainer)), event_name=Events.EPOCH_COMPLETED)
+        tb_logger.attach(evaluator, log_handler=OutputHandler(tag="validation", metric_names=list(metrics.keys()), another_engine=trainer), event_name=Events.EPOCH_COMPLETED)
 
         checkpoint_handler = ModelCheckpoint(log_dir, 'checkpoint', save_interval=1, n_saved=3)
         trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpoint_handler, {'mymodel': getattr(model, 'module', model)})  # "getattr" takes care of distributed encapsulation
@@ -265,7 +296,7 @@ def train():
 
     # On the main process: close tensorboard logger and rename the last checkpoint (for easy re-loading with OpenAIGPTModel.from_pretrained method)
     if args.local_rank in [-1, 0] and args.n_epochs > 0:
-        os.rename(os.path.join(log_dir, checkpoint_handler._saved[-1][1]), os.path.join(log_dir, WEIGHTS_NAME))  # TODO: PR in ignite to have better access to saved file paths (cleaner)
+        os.rename(checkpoint_handler._saved[-1][1][-1], os.path.join(log_dir, WEIGHTS_NAME))  # TODO: PR in ignite to have better access to saved file paths (cleaner)
         tb_logger.close()
 
 if __name__ == "__main__":
