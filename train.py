@@ -189,7 +189,6 @@ def train():
     tokenizer_class = GPT2Tokenizer if "gpt2" in args.model_checkpoint else OpenAIGPTTokenizer # cant use Autotokenizer because checkpoint could be a Path
     tokenizer = tokenizer_class.from_pretrained(args.model_checkpoint)
 
-
     model_class = GPT2DoubleHeadsModel if "gpt2" in args.model_checkpoint else OpenAIGPTDoubleHeadsModel
     model = model_class.from_pretrained(args.model_checkpoint)
     model.to(args.device)
