@@ -17,10 +17,10 @@ PERSONACHAT_URL = "https://s3.amazonaws.com/datasets.huggingface.co/personachat/
 HF_FINETUNED_MODEL = "https://s3.amazonaws.com/models.huggingface.co/transfer-learning-chatbot/gpt_personachat_cache.tar.gz"
 
 logger = logging.getLogger(__file__)
-logger.setLevel(level=logging.DEBUG)
-mp.log_to_stderr(level=logging.DEBUG)
+logger.setLevel(level=logging.INFO)
+mp.log_to_stderr(level=logging.INFO)
 mp_logger = mp.get_logger()
-mp_logger.setLevel(level=logging.DEBUG)
+mp_logger.setLevel(level=logging.INFO)
 
 
 def download_pretrained_model():
