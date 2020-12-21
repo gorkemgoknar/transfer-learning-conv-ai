@@ -1,3 +1,23 @@
+chatbot_interact.py
+Not shared
+Type
+Text
+Size
+9 KB (9,654 bytes)
+Storage used
+9 KB (9,654 bytes)
+Location
+moviescript
+Owner
+me
+Modified
+19 Dec 2020 by me
+Opened
+15:00 by me
+Created
+15:00 with Google Drive Web
+Add a description
+Viewers can download
 # # Copyright (c) 2019-present, HuggingFace Inc.
 # All rights reserved.
 # This source code is licensed under the BSD-style license found in the
@@ -142,16 +162,54 @@ def run():
             return dict((n, tokenize(o)) for n, o in obj.items())
         return list(tokenize(o) for o in obj)
     
+    ##FIND people list
+    ##this is for debug, usually has " is Name"
+    #people = [item[-1][-3:-1] for item in personalities]
+    people = [item[-1][-2:-1] for item in personalities]
+    print(people)
+    #logger.info("Names to choose: %s", tokenizer.decode(chain(*people)))
+    logger.info("Names to choose: %s", tokenizer.decode(chain(*people)))
+    logger.info( tokenize("Draft"))
+    
+    #get each end token from personalities, that has the name
 
-    personality = random.choice(personalities)
+    personality = None 
+    while personality is None:
+      raw_text = input("Enter Name(0 for random)>>> ")
+      if(str(raw_text) == "0"):
+        personality = random.choice(personalities)
+      else:
+        name = " is " + str(raw_text) 
+        name_token = tokenize(name)
+        print(name_token)
+        index_start = len(name_token)+1
+
+        try:
+          
+          index_of_name = [ item[-1][-1*index_start: -1]== name_token for item in personalities].index(True)
+          print("Selected {} is at: {}".format(name, str(index_of_name) ) )
+          personality = personalities[index_of_name]
+        except:
+          print("Not found ... Select again")
+          continue
+
+        
+
+    ##TALK TO HAL
+    #personality_hal = ["that's true. My name is Hal"]
+    #personality = tokenize(personality_hal)
+    #print(personality)
+
+    #personality = random.choice(personalities)
 
     ##TALK TO HAL
     #personality_hal = ["that's true. my name is hal"]
     #personality = tokenize(personality_hal)
-    #print(personality)
+    print(personality)
+
 
     logger.info("Selected personality: %s", tokenizer.decode(chain(*personality)))
-
+    
     history = []
     while True:
         raw_text = input(">>> ")
